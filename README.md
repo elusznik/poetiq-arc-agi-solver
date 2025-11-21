@@ -57,3 +57,48 @@ For questions or to discuss the future of reasoning, reach out to us at poetiq@p
 [![X (formerly Twitter)](https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/poetiq_ai)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/company/poetiq/)
 [![Bluesky](https://img.shields.io/badge/Bluesky-0285FF?style=for-the-badge&logo=Bluesky&logoColor=white)](https://bsky.app/profile/poetiq-ai.bsky.social)
+
+---
+
+## 🧩 General Purpose Solver
+
+The solver has been refactored to be a general-purpose iterative coding agent, capable of solving problems beyond ARC-AGI.
+
+### Architecture
+
+The core logic is decoupled from the ARC domain using abstract interfaces defined in `arc_agi/interfaces.py`:
+- `Problem`: Defines the task (description, examples).
+- `Sandbox`: Executes code (e.g., local Python, Docker).
+- `FeedbackGenerator`: Evaluates solutions.
+- `PromptGenerator`: Creates LLM prompts.
+
+### Running the Generic Example
+
+A "Hello World" math problem example is provided in `examples/math_problem.py`.
+
+1.  **Install dependencies**:
+    ```bash
+    pip install numpy litellm asynciolimiter
+    ```
+
+2.  **Run the example**:
+    ```bash
+    python examples/math_problem.py
+    ```
+
+### Configuration
+
+To configure models and providers:
+
+1.  **Select Model**: Modify the `llm_id` in the `ExpertConfig` dictionary passed to `solve_parallel_coding`. Supported models include `gemini/gemini-1.5-flash`, `openai/gpt-4o`, etc. (any model supported by `litellm`).
+2.  **API Keys**: Ensure the corresponding API key is set in your `.env` file (e.g., `GEMINI_API_KEY`, `OPENAI_API_KEY`).
+
+### Creating Custom Problems
+
+To solve a new type of problem:
+1.  Implement the `Problem` interface.
+2.  Implement a `Sandbox` for your execution environment.
+3.  Implement a `FeedbackGenerator` to score results.
+4.  Implement a `PromptGenerator` for your domain.
+5.  Pass these components to `solve_parallel_coding`.
+OPENROUTER_API_KEY=your_key_here  # Add to .env

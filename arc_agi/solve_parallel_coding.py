@@ -2,6 +2,7 @@ import asyncio
 
 import numpy as np
 
+from arc_agi.interfaces import FeedbackGenerator, Problem, PromptGenerator, Sandbox
 from arc_agi.solve_coding import solve_coding
 from arc_agi.types import ARCAGIResult, ExpertConfig
 from arc_agi.utils import canonical_test_key
@@ -9,16 +10,16 @@ from arc_agi.utils import canonical_test_key
 
 async def solve_parallel_coding(
     *,
-    train_in: list[list[list[int]]],
-    train_out: list[list[list[int]]],
-    test_in: list[list[list[int]]],
+    problem: Problem,
+    sandbox: Sandbox,
+    feedback_generator: FeedbackGenerator,
+    prompt_generator: PromptGenerator | list[PromptGenerator],
     expert_configs: list[ExpertConfig],
-    problem_id: str | None = None,
 ) -> list[ARCAGIResult]:
     """
     Run multiple coding experts in parallel, group by identical test outputs, then rank.
     """
-    #assert len(expert_configs) > 1, "Need at least two expert configs."
+    # assert len(expert_configs) > 1, "Need at least two expert configs."
 
     use_new_voting = expert_configs[0]["use_new_voting"]
     count_failed_matches = expert_configs[0]["count_failed_matches"]
@@ -33,18 +34,25 @@ async def solve_parallel_coding(
         cfg["seed"] += it * cfg["max_iterations"]
 
     # Solve concurrently
-    tasks = [
-        asyncio.create_task(
-            solve_coding(
-                train_in=train_in,
-                train_out=train_out,
-                test_in=test_in,
-                config=cfg,
-                problem_id=problem_id,
+    tasks = []
+    for i, cfg in enumerate(expert_configs):
+        pg = (
+            prompt_generator[i]
+            if isinstance(prompt_generator, list)
+            else prompt_generator
+        )
+        tasks.append(
+            asyncio.create_task(
+                solve_coding(
+                    problem=problem,
+                    sandbox=sandbox,
+                    feedback_generator=feedback_generator,
+                    prompt_generator=pg,
+                    config=cfg,
+                )
             )
         )
-        for cfg in expert_configs
-    ]
+
     results: list[ARCAGIResult] = await asyncio.gather(*tasks)
 
     # Buckets
@@ -73,10 +81,15 @@ async def solve_parallel_coding(
         if iters_tiebreak:
             # Put the lowest (if low_to_high_iters) iterations in position 0 of each sublist.
             passer_groups = [
-                sorted(ps, key=lambda x: x['iteration'], reverse=not low_to_high_iters) for ps in passer_groups
+                sorted(ps, key=lambda x: x["iteration"], reverse=not low_to_high_iters)
+                for ps in passer_groups
             ]
             # Sort the list by min iterations, highest to lowest, so after the last sort below it is lowest to highest.
-            passer_groups = sorted(passer_groups, key=lambda x: x[0]['iteration'], reverse=low_to_high_iters)
+            passer_groups = sorted(
+                passer_groups,
+                key=lambda x: x[0]["iteration"],
+                reverse=low_to_high_iters,
+            )
 
         # Sort passers by how many votes they have.
         passer_groups = sorted(passer_groups, key=len, reverse=True)
